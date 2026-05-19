@@ -10,6 +10,8 @@
 #include <Trade/Trade.mqh>
 CTrade trade;
 
+#include "Bridge_Gemini.mqh"
+
 //====================================================================
 // ENUMS
 //====================================================================
@@ -750,6 +752,40 @@ void EvaluateStatus()
    {
       G_status = "WAIT";
       G_debug = "Score low B" + DoubleToString(G_buyScore,0) + "/S" + DoubleToString(G_sellScore,0) + " < " + IntegerToString(threshold);
+   }
+
+   // === INTEGRASI GEMINI AI ===
+   static string last_analyzed_status = "";
+   
+   if((G_status == "READY BUY" || G_status == "READY SELL") && G_status != last_analyzed_status)
+   {
+      GeminiSetupData gemData;
+      gemData.symbol       = _Symbol;
+      gemData.timeframe    = EnumToString(_Period);
+      gemData.bid_price    = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      gemData.ask_price    = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      gemData.buy_score    = G_buyScore;
+      gemData.sell_score   = G_sellScore;
+      gemData.adx_value    = bADX[s];
+      gemData.spread_points= SpreadPoints();
+      gemData.zone_status  = G_zoneStatus;
+      gemData.supply_top   = G_nearestSupplyTop;
+      gemData.supply_bot   = G_nearestSupplyBottom;
+      gemData.demand_top   = G_nearestDemandTop;
+      gemData.demand_bot   = G_nearestDemandBottom;
+      gemData.ema_bull     = (iClose(_Symbol,_Period,s) > bEMA[s]);
+      gemData.macd_bull    = (bMACDMain[s] > bMACDSignal[s]);
+      gemData.rsi_bull     = (bRSI[s] > 50.0);
+      gemData.stoch_bull   = (bStochMain[s] > bStochSignal[s]);
+      
+      if(GeminiAI.SendDataToAI(gemData))
+      {
+         last_analyzed_status = G_status;
+      }
+   }
+   else if(G_status == "WAIT") 
+   {
+      last_analyzed_status = "";
    }
 }
 
